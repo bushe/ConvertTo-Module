@@ -38,3 +38,4 @@ TODO:
 3. Pester support?   
    a. Is Tests right place for this?
    b. If Pester is install, and Pester tests exists in Tests folder contains tests, Invoke-Pester?  Keep it separate (probably)
+4. Figure out Readme.md crappy formatting
