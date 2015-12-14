@@ -8,24 +8,24 @@ it makes for a very--and needlessly--slow module load.  Especially if you're loa
 Tree structure:
 
 Repository<br/>
-  |<br/>
-  | PowerShell-Module.psm1
-  | PowerShell-Manifest.psd1
-  |
-  |--->en-us
-  |      |  
-  |      | Help files
-  |
-  |--->Source
-  |      |
-  |      |--->Private
-  |      |      |  Private Functions
-  |      |
-  |      |--->Public
-  |      |      |  Public Functions
-  |      |
-  |      |--->Tests
-                |  Pester support
+&nbsp;&nbsp;|<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;PowerShell-Module.psm1<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;PowerShell-Manifest.psd1<br/>
+&nbsp;&nbsp;|<br/>
+&nbsp;&nbsp;|--->en-us<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| Help files<br/>
+&nbsp;&nbsp;|<br/>
+&nbsp;&nbsp;|--->Source<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br/>
+&nbsp;&nbsp;||--->Private<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|Private Functions<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;--->Public<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|Public Functions<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|<br/>
+&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|--->Tests<br/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|Pester support<br/>
                 
 
 
