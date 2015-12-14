@@ -31,11 +31,11 @@ Repository<br/>
 
 TODO:
 
-Done. Modify http://thesurlyadmin.com/2015/01/20/building-modules/ for these purposes
-2. Comment-based help support, pull function help out and put into module help.  
-   a. Think will just pull .DESCRIPTION section
-   b. International help (not just en-us)
-3. Pester support?   
-   a. Is Tests right place for this?
-   b. If Pester is install, and Pester tests exists in Tests folder contains tests, Invoke-Pester?  Keep it separate (probably)
-4. Figure out Readme.md crappy formatting
+Done. Modify http://thesurlyadmin.com/2015/01/20/building-modules/ for these purposes<br/>
+2. Comment-based help support, pull function help out and put into module help.  <br/>
+   a. Think will just pull .DESCRIPTION section<br/>
+   b. International help (not just en-us)<br/>
+3. Pester support?   <br/>
+   a. Is Tests right place for this?<br/>
+   b. If Pester is install, and Pester tests exists in Tests folder contains tests, Invoke-Pester?  Keep it separate (probably)<br/>
+Ugh. Figure out Readme.md crappy formatting<br/>
