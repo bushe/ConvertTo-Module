@@ -7,7 +7,7 @@ it makes for a very--and needlessly--slow module load.  Especially if you're loa
 
 Tree structure:
 
-Repository
+Repository<br/>
   |
   | PowerShell-Module.psm1
   | PowerShell-Manifest.psd1
