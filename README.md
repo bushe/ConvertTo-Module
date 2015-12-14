@@ -31,9 +31,9 @@ Repository
 
 TODO:
 
-1. Modify http://thesurlyadmin.com/2015/01/20/building-modules/ for these purposes
+Done. Modify http://thesurlyadmin.com/2015/01/20/building-modules/ for these purposes
 2. Comment-based help support, pull function help out and put into module help.  
-   a. Potential have separate help?  #region Help Maybe?
+   a. Think will just pull .DESCRIPTION section
    b. International help (not just en-us)
 3. Pester support?   
    a. Is Tests right place for this?

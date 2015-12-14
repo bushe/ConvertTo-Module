@@ -72,12 +72,11 @@
 #>
 [CmdletBinding()]
 Param (
-    [string]$Path = "\\opsadmin101\scripts\Functions-ForModules",
-    [string]$ModulePath = "\\opsadmin101\scripts\Modules",
-    [string]$CompanyName = "athena health"
+    [string]$Path = "c:\Dropbox\test\citrix.NetScaler"
 )
 Write-Verbose "$(Get-Date): Publish-Module.ps1 started"
 
+#Test for path
 If ($Path)
 {
     If (-not (Test-Path $Path))
@@ -87,34 +86,38 @@ If ($Path)
 }
 Else
 {
-    $Path = (Split-Path $MyInvocation.MyCommand.Path)
-}
-If ($ModulePath)
-{
-    If (-not (Test-Path $ModulePath))
-    {
-        Throw "$ModulePath is an invalid folder"
-    }
-}
-Else
-{
-    $ModulePath = Join-Path -Path (Split-Path $MyInvocation.MyCommand.Path) -ChildPath "Modules"
+    $Path = Split-Path -Path ($MyInvocation.MyCommand.Path)
 }
 
-$Dirs = Get-ChildItem $Path -Directory -Recurse | Where FullName -NotLike "*Exclude*"
-Write-Verbose "$(Get-Date): $($Dirs.Count) module folders found.  Creating modules..."
-ForEach ($Dir in $Dirs)
+#Test for needed folders, create if necessary
+$PathList = "Source","Private","Public","Test"
+$ParentPath = $Path
+ForEach ($SubPath in $PathList)
 {
-    Write-Verbose "$(Get-Date): Creating $($Dir.BaseName) module"
-    $Statements = New-Object -TypeName System.Collections.ArrayList
-    $Functions = New-Object -TypeName System.Collections.ArrayList
-    $HighVersion = [version]"2.0"
-    $Files = Get-ChildItem "$($Dir.Fullname)\*.ps1" -Recurse
+    Remove-Variable -Name "$SubPath`Path" -Force
+    $tempPath = New-Variable -Name "$SubPath`Path" -Value (Join-Path -Path $ParentPath -ChildPath $SubPath) -Passthru
+    If (-not (Test-Path $tempPath.Value))
+    {
+        New-Item -Path $tempPath.Value -ItemType Directory | Out-Null
+    }
+    $ParentPath = $SourcePath
+}
+
+#Read in the functions
+$Statements = New-Object -TypeName System.Collections.ArrayList
+$Functions = New-Object -TypeName System.Collections.ArrayList
+$PublicFunctionNames = New-Object -TypeName System.Collections.ArrayList
+$HighVersion = [version]"0.0.0.2"
+ForEach ($FunctionType in "Private","Public")
+{
+    $tempPath = Get-Variable -Name "$FunctionType`Path" | Select -ExpandProperty Value
+    $Files = Get-ChildItem "$tempPath\*.ps1" -Recurse
     ForEach ($File in $Files)
     {
         $Raw = Get-Content $File
         $Count = 0
-        $Begin = $PublishRegion = $false
+        $Begin = $false
+        $PublishRegion = $false
         $Function = New-Object -TypeName System.Collections.ArrayList
         ForEach ($Line in $Raw)
         {
@@ -145,6 +148,11 @@ ForEach ($Dir in $Dirs)
             If ($Line -like "Function*" -and (-not $Begin))
             {
                 $Begin = $true
+                If ($Line -match "(Function (?<FunctionName>.*) )|(Function (?<FunctionName>.*)$)" -and $FunctionType -eq "Public")
+                {
+                    $PublicFunctionNames.Add($Matches.FunctionName.Trim()) | Out-Null
+                }
+
                 If ($Line -notlike "*{*")
                 {
                     $Function.Add($Line) | Out-Null
@@ -177,71 +185,65 @@ ForEach ($Dir in $Dirs)
             }
         }
     }
-
-    #Save module
-    $ModuleDir = Join-Path -Path $ModulePath -ChildPath $Dir.BaseName
-    If (-not (Test-Path $ModuleDir))
-    {
-        New-Item -Path $ModuleDir -ItemType Directory | Out-Null
-    }
-    $OutModule = Join-Path -Path $ModuleDir -ChildPath "$($Dir.BaseName).psm1"
-    $Functions -join "`n`n`n" | Out-File $OutModule -Encoding ascii
-    Add-Content -Value "`n`n#Included Statements:" -Path $OutModule
-    Add-Content -Value $Statements -Path $OutModule
-    Add-Content -Value "`n`nExport-ModuleMember -Alias * -Function *" -Path $OutModule
-    Write-Verbose "$(Get-Date): Module $($Dir.BaseName) created.  $($Functions.Count) functions included"
-
-    #Create manifest
-    $OutManifest = Join-Path -Path $ModuleDir -ChildPath "$($Dir.BaseName).psd1"
-    If (Test-Path $OutManifest)
-    {
-        $Manifest = Invoke-Expression -Command (Get-Content $OutManifest -Raw)
-        $LastChange = (Get-ChildItem $OutManifest).LastWriteTime
-        $ChangedFiles = ($Files | Where LastWriteTime -gt $LastChange).Count
-        $PercentChange = 100 - ((($Files.Count - $ChangedFiles) / $Files.Count) * 100)
-        $Version = ([version]$Manifest["ModuleVersion"]) | Select Major,Minor,Build,Revision
-        If ($PercentChange -ge 50)
-        {
-            $Version.Major ++
-            $Version.Minor = 0
-            $Version.Build = 0
-            $Version.Revision = 0
-        }
-        ElseIf ($PercentChange -ge 25)
-        {
-            $Version.Minor ++
-            $Version.Build = 0
-            $Version.Revision = 0
-        }
-        ElseIf ($PercentChagne -ge 10)
-        {
-            $Version.Build ++
-            $Version.Revision = 0
-        }
-        ElseIf ($PercentChange -gt 0)
-        {
-            $Version.Revision ++
-        }
-        $Manifest["ModuleVersion"] = "$($Version.Major).$($Version.Minor).$($Version.Build).$($Version.Revision)"
-
-    }
-    Else
-    {
-        $Manifest = @{
-            RootModule = $Dir.BaseName
-            ModuleVersion = "1.0.0.0"
-            CompanyName = $CompanyName
-        }
-    }
-    $Manifest.Add("Path",$OutManifest)
-    $Manifest["PowerShellVersion"] = "$($HighVersion.Major).$($HighVersion.Minor)"
-    If ($Manifest["CompanyName"] -eq "Unknown")
-    {
-        $Manifest["CompanyName"] = $CompanyName
-    }
-    New-ModuleManifest @Manifest
-    Write-Verbose "$(Get-Date): Manifest for $($Dir.BaseName) created"
 }
+
+#Save module
+$OutModule = Join-Path -Path $Path -ChildPath "$(Split-Path -Path $Path -Leaf).psm1"
+$Functions -join "`n`n`n" | Out-File $OutModule -Encoding ascii
+Add-Content -Value "`n`n#Included Statements:" -Path $OutModule
+Add-Content -Value $Statements -Path $OutModule
+Add-Content -Value "`n`nExport-ModuleMember -Alias * -Function `"$($PublicFunctionNames -join '","')`"" -Path $OutModule
+
+#Create manifest
+$OutManifest = Join-Path -Path $Path -ChildPath "$(Split-Path -Path $Path -Leaf).psd1"
+If (Test-Path $OutManifest)
+{
+    $Manifest = Invoke-Expression -Command (Get-Content $OutManifest -Raw)
+    $LastChange = (Get-ChildItem $OutManifest).LastWriteTime
+    $ChangedFiles = ($Files | Where LastWriteTime -gt $LastChange).Count
+    $PercentChange = 100 - ((($Files.Count - $ChangedFiles) / $Files.Count) * 100)
+    $Version = ([version]$Manifest["ModuleVersion"]) | Select Major,Minor,Build,Revision
+    If ($PercentChange -ge 50)
+    {
+        $Version.Major ++
+        $Version.Minor = 0
+        $Version.Build = 0
+        $Version.Revision = 0
+    }
+    ElseIf ($PercentChange -ge 25)
+    {
+        $Version.Minor ++
+        $Version.Build = 0
+        $Version.Revision = 0
+    }
+    ElseIf ($PercentChagne -ge 10)
+    {
+        $Version.Build ++
+        $Version.Revision = 0
+    }
+    ElseIf ($PercentChange -gt 0)
+    {
+        $Version.Revision ++
+    }
+    $Manifest["ModuleVersion"] = "$($Version.Major).$($Version.Minor).$($Version.Build).$($Version.Revision)"
+
+}
+Else
+{
+    $Manifest = @{
+        RootModule = $Dir.BaseName
+        ModuleVersion = "1.0.0.0"
+        CompanyName = $CompanyName
+    }
+}
+$Manifest.Add("Path",$OutManifest)
+$Manifest["PowerShellVersion"] = "$($HighVersion.Major).$($HighVersion.Minor)"
+If ($Manifest["CompanyName"] -eq "Unknown")
+{
+    $Manifest["CompanyName"] = $CompanyName
+}
+New-ModuleManifest @Manifest
+Write-Verbose "$(Get-Date): Manifest for $($Dir.BaseName) created"
 
 Write-Verbose "$(Get-Date): Modules created at: $ModulePath"
 Write-Verbose "$(Get-Date): Publish-Module.ps1 completed"
