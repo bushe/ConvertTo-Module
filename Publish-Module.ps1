@@ -76,6 +76,8 @@ Param (
 )
 Write-Verbose "$(Get-Date): Publish-Module.ps1 started"
 
+$CBHKeywords = "(SYNOPSIS)|(DESCRIPTION)|(PARAMETER)|(EXAMPLE)|(INPUTS)|(OUTPUTS)|(NOTES)|(LINK)|(COMPONENT)|(ROLE)|(FUNCTIONALITY)|(FORWARDHELPTARGETNAME)|(FORWARDHELPCATEGORY)|(EXTERNALHELP)"
+
 #Test for path
 If ($Path)
 {
@@ -94,7 +96,7 @@ $PathList = "Source","Private","Public","Test"
 $ParentPath = $Path
 ForEach ($SubPath in $PathList)
 {
-    Remove-Variable -Name "$SubPath`Path" -Force
+    Remove-Variable -Name "$SubPath`Path" -Force -ErrorAction SilentlyContinue
     $tempPath = New-Variable -Name "$SubPath`Path" -Value (Join-Path -Path $ParentPath -ChildPath $SubPath) -Passthru
     If (-not (Test-Path $tempPath.Value))
     {
@@ -102,11 +104,18 @@ ForEach ($SubPath in $PathList)
     }
     $ParentPath = $SourcePath
 }
+<#
+$HelpPath = Join-Path -Path $Path -ChildPath "en-US"
+If (-not (Test-Path $HelpPath))
+{
+    New-Item -Path $HelpPath -ItemType Directory | Out-Null
+}
+#>
 
 #Read in the functions
 $Statements = New-Object -TypeName System.Collections.ArrayList
 $Functions = New-Object -TypeName System.Collections.ArrayList
-$PublicFunctionNames = New-Object -TypeName System.Collections.ArrayList
+$PublicFunctionNames = @{}
 $HighVersion = [version]"0.0.0.2"
 ForEach ($FunctionType in "Private","Public")
 {
@@ -118,9 +127,11 @@ ForEach ($FunctionType in "Private","Public")
         $Count = 0
         $Begin = $false
         $PublishRegion = $false
+        #$Synopsis = $false
         $Function = New-Object -TypeName System.Collections.ArrayList
         ForEach ($Line in $Raw)
         {
+            Write-host $Line
             If ($Line -like "#Publish*")
             {
                 $PublishRegion = $true
@@ -150,7 +161,11 @@ ForEach ($FunctionType in "Private","Public")
                 $Begin = $true
                 If ($Line -match "(Function (?<FunctionName>.*) )|(Function (?<FunctionName>.*)$)" -and $FunctionType -eq "Public")
                 {
-                    $PublicFunctionNames.Add($Matches.FunctionName.Trim()) | Out-Null
+                    $FName = $Matches.FunctionName.Trim()
+                    If (-not $PublicFunctionNames.ContainsKey($FName))
+                    {
+                        $PublicFunctionNames.Add($FName,(New-Object -TypeName System.Collections.ArrayList)) | Out-Null
+                    }
                 }
 
                 If ($Line -notlike "*{*")
@@ -161,6 +176,27 @@ ForEach ($FunctionType in "Private","Public")
             }
             If ($Begin)
             {
+                #If ($Synopsis)
+                #{
+                #    If ($Line -match $CBHKeywords -or $Line -like "*#>*")
+                <#    {
+                        $Synopsis = $false
+                    }
+                    Else
+                    {
+                        $PublicFunctionNames[$FName].Add($Line) | Out-Null
+                    }
+                }
+                If ($Line -match "\.SYNOPSIS(?<FirstLine>.*)" -and -not ($Synopsis))
+                {
+                    If ($Matches.FirstLine)
+                    {
+                        $PublicFunctionNames[$FName].Add($Matches.FirstLine) | Out-Null
+                    }
+                    $Synopsis = $true
+                }
+                #>
+
                 If ($Line -match "#requires -version (?<Version>.*)")
                 {
                     $temp = $Matches.Version + ".0"
@@ -191,8 +227,30 @@ ForEach ($FunctionType in "Private","Public")
 $OutModule = Join-Path -Path $Path -ChildPath "$(Split-Path -Path $Path -Leaf).psm1"
 $Functions -join "`n`n`n" | Out-File $OutModule -Encoding ascii
 Add-Content -Value "`n`n#Included Statements:" -Path $OutModule
+Start-Sleep -Milliseconds 500
 Add-Content -Value $Statements -Path $OutModule
-Add-Content -Value "`n`nExport-ModuleMember -Alias * -Function `"$($PublicFunctionNames -join '","')`"" -Path $OutModule
+Start-Sleep -Milliseconds 500
+Add-Content -Value "`n`nExport-ModuleMember -Alias * -Function `"$($PublicFunctionNames.Keys -join '","')`"" -Path $OutModule
+
+<# Removing automatic help creation, it just doesn't look good
+$HelpFunctions = ForEach ($Func in $PublicFunctionNames.Keys)
+{
+    Write-Output "$Func`n"
+    ForEach ($Line in $PublicFunctionNames[$Func])
+    {
+        Write-Output "$Line`n"
+    }
+    Write-Output " "
+}
+$Help = @"
+TOPIC
+$(Split-Path -Path $Path -Leaf)
+
+LONG DESCRIPTION
+$HelpFunctions
+"@
+$Help | Out-File (Join-Path -Path $HelpPath -ChildPath "about_$(Split-Path -Path $Path -Leaf).help.txt") -Encoding utf8
+#>
 
 #Create manifest
 $OutManifest = Join-Path -Path $Path -ChildPath "$(Split-Path -Path $Path -Leaf).psd1"
