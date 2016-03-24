@@ -36,7 +36,7 @@
 .OUTPUTS
     None
 .EXAMPLE
-    .\Publish-Module.ps1 -Path -Path "\\server\share\Functions"
+    .\ConvertTo-Module.ps1 -Path -Path "\\server\share\Functions"
 
     Take all of the PS1 files in \\server\share\Functions and extract the functions from them and publish the resulting
     module(s) in the base directory:  \\server\share\Functions
@@ -54,15 +54,16 @@
                         alias.
         1.2             Fixed module not loading when specifying folder instead of PSM1 file.  Removed automatic version incrementing.
                         Updated cbh
+        1.21            Changed name to ConvertTo-Module since Publish-Module is now part of PS 5
 .LINK
-    https://github.com/martin9700/Publish-Module
+    https://github.com/martin9700/ConvertTo-Module
 #>
 [CmdletBinding()]
 Param (
     [string]$Path,
     [string]$CompanyName = "Unknown"
 )
-Write-Verbose "$(Get-Date): Publish-Module.ps1 started"
+Write-Verbose "$(Get-Date): ConvertTo-Module.ps1 started"
 
 #Test for path
 If ($Path)
@@ -206,10 +207,11 @@ If (-not (Test-Path $OutManifest))
         CompanyName = $CompanyName
         Path = $OutManifest
         PowerShellVersion = "$($HighVersion.Major).$($HighVersion.Minor)"
+        Description = $ModuleName
     }
     New-ModuleManifest @Manifest
     Write-Verbose "$(Get-Date): Manifest for $($Path.BaseName) created"
 }
 
 Write-Verbose "$(Get-Date): Modules created at: $OutModule"
-Write-Verbose "$(Get-Date): Publish-Module.ps1 completed"
+Write-Verbose "$(Get-Date): ConvertTo-Module.ps1 completed"

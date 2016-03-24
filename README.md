@@ -1,4 +1,4 @@
-# Publish-Module
+# ConvertTo-Module
 This script will take a folder and create a module from it.  The idea is to make for easier module publishing in Git by 
 taking a folder structure, reading the scripts in those folders and creating a module (with manifest).
 
