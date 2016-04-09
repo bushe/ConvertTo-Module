@@ -6,6 +6,7 @@
         \Source
         \Source\Private
         \Source\Public
+        \Source\Test
 
     And create a PowerShell module from them.  Will create the folders, module file and manifest (unless it already exists).  Any 
     PS1 file that contains a Function in it will be read and added to the module.  PS1 files in the Private folder will not be
@@ -61,7 +62,18 @@
 [CmdletBinding()]
 Param (
     [string]$Path,
-    [string]$CompanyName = "Unknown"
+    [string[]]$AliasesToExport,
+    [string]$Author,
+    [string]$CompanyName,
+    [string]$Copyright,
+    [string]$DefaultCommandPrefix,
+    [string]$Description,
+    [string[]]$FileList,
+    [guid]$Guid,
+    [string]$HelpInfoUri,
+    [version]$ModuleVersion,
+    [object[]]$RequiredModules,
+    [version]$PowerShellVersion
 )
 Write-Verbose "$(Get-Date): ConvertTo-Module.ps1 started"
 
@@ -139,12 +151,16 @@ ForEach ($FunctionType in "Private","Public")
             If ($Line -like "Function*" -and (-not $Begin))
             {
                 $Begin = $true
-                If ($Line -match "(Function (?<FunctionName>.*) )|(Function (?<FunctionName>.*)$)" -and $FunctionType -eq "Public")
+                If ($Line -match "Function (?<FunctionName>\w+(-|.)?\w+)( |\{)?.*" -and $FunctionType -eq "Public")
                 {
                     $FName = $Matches.FunctionName.Trim()
                     If (-not $PublicFunctionNames.ContainsKey($FName))
                     {
-                        $PublicFunctionNames.Add($FName,(New-Object -TypeName System.Collections.ArrayList)) | Out-Null
+                        $PublicFunctionNames.Add($FName,"") 
+                    }
+                    Else
+                    {
+                        Write-Warning "Duplicate function found in $File.  Function Name: $FName"
                     }
                 }
 
@@ -192,25 +208,32 @@ $($Functions -join "`n`n`n")
 #Included Statements:
 $($Statements -join "`n")
 
-
-Export-ModuleMember -Alias * -Function `"$($PublicFunctionNames.Keys -join '","')`"
 "@
 $Module | Out-File $OutModule -Force
 
 #Create manifest
 $OutManifest = Join-Path -Path $Path -ChildPath "$ModuleName.psd1"
+$ManifestSplat = $PSBoundParameters
+$ManifestSplat.Path = $OutManifest
+$ManifestSplat.FunctionsToExport = [array]$PublicFunctionNames.Keys
 If (-not (Test-Path $OutManifest))
 {
-    $Manifest = @{
-        RootModule = $ModuleName
-        ModuleVersion = "1.0.0.0"
-        CompanyName = $CompanyName
-        Path = $OutManifest
-        PowerShellVersion = "$($HighVersion.Major).$($HighVersion.Minor)"
-        Description = $ModuleName
+    $ManifestSplat.RootModule = $ModuleName
+    If (-not $PowerShellVersion)
+    {
+        $ManifestSplat.PowerShellVersion = "$($HighVersion.Major).$($HighVersion.Minor)"
     }
-    New-ModuleManifest @Manifest
-    Write-Verbose "$(Get-Date): Manifest for $($Path.BaseName) created"
+    If (-not $Description)
+    {
+        $ManifestSplat.Description = $ModuleName
+    }
+    New-ModuleManifest @ManifestSplat
+    Write-Verbose "$(Get-Date): Manifest for $ModuleName created"
+}
+Else
+{
+    Update-ModuleManifest @ManifestSplat
+    Write-Verbose "$(Get-Date): Manifest for $ModuleName was updated"
 }
 
 Write-Verbose "$(Get-Date): Modules created at: $OutModule"
