@@ -29,8 +29,9 @@
 .PARAMETER Path
     The path where you module folders and PS1 files containing your functions is located.
 
-.PARAMETER CompanyName
-    Only used when a module is created for the first time, you can put the company name in the appropriate field.
+.PARAMETER Name
+    Name of the module.  By default it will be the same name as the parent directly.
+        c:\modules\MyTools    - Module Name would be MyTools
 
 .INPUTS
     None
@@ -62,6 +63,7 @@
 [CmdletBinding()]
 Param (
     [string]$Path,
+    [string]$Name,
     [string[]]$AliasesToExport,
     [string]$Author,
     [string]$CompanyName,
@@ -199,7 +201,14 @@ ForEach ($FunctionType in "Private","Public")
 }
 
 #Save module
-$ModuleName = Split-Path -Path $Path -Leaf
+If ($Name)
+{
+    $ModuleName = $Name
+}
+Else
+{
+    $ModuleName = Split-Path -Path $Path -Leaf
+}
 $OutModule = Join-Path -Path $Path -ChildPath "$ModuleName.psm1"
 $Module = @"
 $($Functions -join "`n`n`n")
@@ -214,6 +223,7 @@ $Module | Out-File $OutModule -Force
 #Create manifest
 $OutManifest = Join-Path -Path $Path -ChildPath "$ModuleName.psd1"
 $ManifestSplat = $PSBoundParameters
+$ManifestSplat.Remove("Name") | Out-Null
 $ManifestSplat.Path = $OutManifest
 $ManifestSplat.FunctionsToExport = [array]$PublicFunctionNames.Keys
 If (-not (Test-Path $OutManifest))
