@@ -5,7 +5,7 @@
     Take a group of folders in this format:
         \Source
         \Source\Private
-        \Source\Public
+        \Source\Public(Optional, can be stored in Source root)
         \Source\Test
 
     And create a PowerShell module from them.  Will create the folders, module file and manifest (unless it already exists).  Any 
@@ -75,7 +75,8 @@ Param (
     [string]$HelpInfoUri,
     [version]$ModuleVersion,
     [object[]]$RequiredModules,
-    [version]$PowerShellVersion
+    [version]$PowerShellVersion,
+    [switch]$ForceFolderCreation    
 )
 Write-Verbose "$(Get-Date): ConvertTo-Module.ps1 started"
 
@@ -93,16 +94,26 @@ Else
 }
 
 #Test for needed folders, create if necessary
-$PathList = "Source","Private","Public","Test"
+$PathList = "Source","Public","Private","Test"
 $ParentPath = $Path
 ForEach ($SubPath in $PathList)
 {
     Remove-Variable -Name "$SubPath`Path" -Force -ErrorAction SilentlyContinue
     $tempPath = New-Variable -Name "$SubPath`Path" -Value (Join-Path -Path $ParentPath -ChildPath $SubPath) -Passthru
+    
+    if($SubPath -eq "Public" -and -not (Test-Path $tempPath.Value) -and (Get-ChildItem $SourcePath\*.ps1).count -ge 1){
+        Write-Verbose "No Public folder found so Defaulting to .ps1 stored directly in source"
+        Set-Variable -Name "$SubPath`Path" -Value $SourcePath
+    }
+    
     If (-not (Test-Path $tempPath.Value))
     {
         New-Item -Path $tempPath.Value -ItemType Directory | Out-Null
     }
+    elseif($ParentPath -eq $SourcePath -and $ForceFolderCreation -eq $false)
+    {
+        break
+    }    
     $ParentPath = $SourcePath
 }
 
@@ -113,86 +124,88 @@ $PublicFunctionNames = @{}
 $HighVersion = [version]"0.0.0.2"
 ForEach ($FunctionType in "Private","Public")
 {
-    $tempPath = Get-Variable -Name "$FunctionType`Path" | Select -ExpandProperty Value
-    $Files = Get-ChildItem "$tempPath\*.ps1" -Recurse
-    ForEach ($File in $Files)
-    {
-        $Raw = Get-Content $File
-        $Count = 0
-        $Begin = $false
-        $PublishRegion = $false
-        #$Synopsis = $false
-        $Function = New-Object -TypeName System.Collections.ArrayList
-        ForEach ($Line in $Raw)
+    $tempPath = Get-Variable -Name "$FunctionType`Path" -ErrorAction SilentlyContinue | Select -ExpandProperty Value
+    if($tempPath){
+        $Files = Get-ChildItem "$tempPath\*.ps1" -Recurse
+        ForEach ($File in $Files)
         {
-            #Write-host $Line
-            If ($Line -like "#Publish*")
+            $Raw = Get-Content $File
+            $Count = 0
+            $Begin = $false
+            $PublishRegion = $false
+            #$Synopsis = $false
+            $Function = New-Object -TypeName System.Collections.ArrayList
+            ForEach ($Line in $Raw)
             {
-                $PublishRegion = $true
-                Continue
-            }
-            If ($PublishRegion -and (-not $Begin))
-            {
-                If ($Line -like "Function*")
+                #Write-host $Line
+                If ($Line -like "#Publish*")
                 {
-                    $PublishRegion = $false
+                    $PublishRegion = $true
+                    Continue
                 }
-                Else
+                If ($PublishRegion -and (-not $Begin))
                 {
-                    If ($Line -like "#EndPublish*")
+                    If ($Line -like "Function*")
                     {
                         $PublishRegion = $false
                     }
                     Else
                     {
-                        $Statements.Add($Line) | Out-Null
+                        If ($Line -like "#EndPublish*")
+                        {
+                            $PublishRegion = $false
+                        }
+                        Else
+                        {
+                            $Statements.Add($Line) | Out-Null
+                        }
+                        Continue
                     }
-                    Continue
                 }
-            }
-            If ($Line -like "Function*" -and (-not $Begin))
-            {
-                $Begin = $true
-                If ($Line -match "Function (?<FunctionName>\w+(-|.)?\w+)( |\{)?.*" -and $FunctionType -eq "Public")
+                If ($Line -like "Function*" -and (-not $Begin))
                 {
-                    $FName = $Matches.FunctionName.Trim()
-                    If (-not $PublicFunctionNames.ContainsKey($FName))
+                    $Begin = $true
+                    If ($Line -match "Function (?<FunctionName>\w+(-|.)?\w+)( |\{)?.*" -and $FunctionType -eq "Public")
                     {
-                        $PublicFunctionNames.Add($FName,"") 
+                        $FName = $Matches.FunctionName.Trim()
+                        If (-not $PublicFunctionNames.ContainsKey($FName))
+                        {
+                            $PublicFunctionNames.Add($FName,"") 
+                        }
+                        Else
+                        {
+                            Write-Warning "Duplicate function found in $File.  Function Name: $FName"
+                        }
+                    }
+
+                    If ($Line -notlike "*{*")
+                    {
+                        $Function.Add($Line) | Out-Null
+                        Continue
+                    }
+                }
+                If ($Begin)
+                {
+                    If ($Line -match "#requires -version (?<Version>.*)")
+                    {
+                        $temp = $Matches.Version + ".0"
+                        $Version = [version]$temp
+                        If ($Version -gt $HighVersion)
+                        {
+                            $HighVersion = $Version
+                        }
                     }
                     Else
                     {
-                        Write-Warning "Duplicate function found in $File.  Function Name: $FName"
-                    }
-                }
-
-                If ($Line -notlike "*{*")
-                {
-                    $Function.Add($Line) | Out-Null
-                    Continue
-                }
-            }
-            If ($Begin)
-            {
-                If ($Line -match "#requires -version (?<Version>.*)")
-                {
-                    $temp = $Matches.Version + ".0"
-                    $Version = [version]$temp
-                    If ($Version -gt $HighVersion)
-                    {
-                        $HighVersion = $Version
-                    }
-                }
-                Else
-                {
-                    $Count = $Count + ($Line.Split("{").Count - 1)
-                    $Count = $Count - ($Line.Split("}").Count - 1)
-                    $Function.Add($Line) | Out-Null
-                    If ($Count -eq 0)
-                    {
-                        $Functions.Add($Function -join "`n") | Out-Null
-                        $Function = New-Object -TypeName System.Collections.ArrayList
-                        $Begin = $false
+                        $Count = $Count + ($Line.Split("{").Count - 1)
+                        $Count = $Count - ($Line.Split("}").Count - 1)
+                        $Function.Add($Line) | Out-Null
+                        If ($Count -eq 0)
+                        {
+                            $Functions.Add($Function -join "`n") | Out-Null
+                            $Function = New-Object -TypeName System.Collections.ArrayList
+                            $Begin = $false
+                        }
                     }
                 }
             }
@@ -223,7 +236,15 @@ $Module | Out-File $OutModule -Force
 #Create manifest
 $OutManifest = Join-Path -Path $Path -ChildPath "$ModuleName.psd1"
 $ManifestSplat = $PSBoundParameters
-$ManifestSplat.Remove("Name") | Out-Null
+
+Write-Verbose "Removing any Parameters not supported by Update-ModuleManifest"
+foreach($Parameter in $ManifestSplat){
+    $AvailableParams = Get-Command Update-ModuleManifest  | Select -ExpandProperty Parameters
+    if($AvailableParams -notcontains $Parameter){
+        $ManifestSplat.Remove($Parameter) | Out-Null
+    }
+}
+
 $ManifestSplat.Path = $OutManifest
 $ManifestSplat.FunctionsToExport = [array]$PublicFunctionNames.Keys
 If (-not (Test-Path $OutManifest))
