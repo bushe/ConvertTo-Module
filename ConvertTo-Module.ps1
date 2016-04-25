@@ -32,6 +32,9 @@
 .PARAMETER Name
     Name of the module.  By default it will be the same name as the parent directly.
         c:\modules\MyTools    - Module Name would be MyTools
+        
+.PARAMETER ForceFolderCreation
+    ForceFolderCreation will force the creation of Private and Tests folders if they were deleted.       
 
 .INPUTS
     None
